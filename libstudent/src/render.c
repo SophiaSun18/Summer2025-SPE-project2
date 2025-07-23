@@ -20,6 +20,10 @@ typedef struct renderer_state {
   float *img;
 } renderer_state_t;
 
+typedef struct {
+  float x, y;
+} vector_2d;
+
 renderer_state_t* init_renderer(const renderer_spec_t *spec) {
   renderer_state_t *state = (renderer_state_t*)malloc(sizeof(renderer_state_t));
   state->r_spec = *spec;
@@ -132,48 +136,90 @@ void set_pixel(renderer_state_t *state, int x, int y, float red, float green, fl
 }
 
 const float* render(renderer_state_t *state, const sphere_t *spheres, int n_spheres) {
+
+  // sort the spheres first as before
   sphere_t* sorted_spheres = sort(state, spheres, n_spheres);
   assert(sorted_spheres != NULL);
-  ray_t r;
 
-  for (int y = 0; y < state->r_spec.resolution; y++) {
-    for (int x = 0; x < state->r_spec.resolution; x++) {
-      r = origin_to_pixel(state, x, y);
+  int res = state->r_spec.resolution;
+  vector_t e = state->r_spec.eye;
+  vector_t u = state->r_spec.proj_plane_u;
+  vector_t v = state->r_spec.proj_plane_v;
+  vector_t w = qcross(u, v);
 
-      // Finds the first ray-sphere intersection.
-      // Since spheres are sorted, the first intersection will also
-      // be the closest intersection.
-      float t = INFINITY;
-      int currentSphere = -1;
+  // loop through each sphere
+  for (int i = 0; i < n_spheres; i++) {
+    sphere_t currentSphere = sorted_spheres[i];
+    material_t currentMat = currentSphere.mat;
 
-      for (int i = 0; i < n_spheres; i++) {
-        if (ray_sphere_intersection(&r, &sorted_spheres[i], &t)) {
-          currentSphere = i;
-          break;
+    vector_t sphereCenter = currentSphere.pos;
+    float sphereRadius = currentSphere.r;
+
+    float min_x = sphereCenter.x - sphereRadius, max_x = sphereCenter.x + sphereRadius;
+    float min_y = sphereCenter.y - sphereRadius, max_y = sphereCenter.y + sphereRadius;
+    float min_z = sphereCenter.z - sphereRadius, max_z = sphereCenter.z + sphereRadius;
+
+    // collect the 8 corners of the cube in space and project to the 2d plane
+    vector_2d bound_box[8];
+    int count = 0;
+
+    for (int x = 0; x < 2; x++) {
+      for (int y = 0; y < 2; y++) {
+        for (int z = 0; z < 2; z++) {
+          vector_t corner;
+          corner.x = (x == 0) ? min_x : max_x;
+          corner.y = (y == 0) ? min_y : max_y;
+          corner.z = (z == 0) ? min_z : max_z;
+
+          vector_t dir = qsubtract(e, corner);
+          float k = qdot(e, w) / qdot(dir, w) * -1;
+          vector_t p = qadd(e, scale(k, dir));
+
+          vector_2d xy = {qdot(p, u), qdot(p, v)};
+          bound_box[count++] = xy;
+          
         }
       }
+    }
 
-      // If ray does not intersect any sphere, color the pixel black
-      if (currentSphere == -1) {
+    float min_x_2d = bound_box[0].x, max_x_2d = bound_box[0].x;
+    float min_y_2d = bound_box[0].y, max_y_2d = bound_box[0].y;
+
+    for (int n = 0; n < 8; n++) {
+      min_x_2d = bound_box[n].x < min_x_2d ? bound_box[n].x : min_x_2d;
+      max_x_2d = bound_box[n].x > max_x_2d ? bound_box[n].x : max_x_2d;
+      min_y_2d = bound_box[n].y < min_y_2d ? bound_box[n].y : min_y_2d;
+      max_y_2d = bound_box[n].y > max_y_2d ? bound_box[n].y : max_y_2d;
+    }
+    int x0 = (int)floorf(min_x_2d);
+    int x1 = (int)ceilf(max_x_2d);
+    int y0 = (int)floorf(min_y_2d);
+    int y1 = (int)ceilf(max_y_2d);
+
+    // go through each pixel of the current sphere's projection
+    for (int y = y0; y <= y1; y++) {
+      for (int x = x0; x <= x1; x++) {
+      
+      // compute the ray to the current pixel
+      ray_t r = origin_to_pixel(state, x, y);
+
+      // check ray sphere intersection and get the distance
+      float t;
+      if (!ray_sphere_intersection(&r, &currentSphere, &t)) {
         set_pixel(state, x, y, 0, 0, 0);
         continue;
       }
 
-      material_t currentMat = sorted_spheres[currentSphere].mat;
-
+      // get the normal vector at intersection point and the sphere radius
       vector_t intersection = qadd(r.origin, scale(t, r.dir));
-
-      // Normal vector at intersection point, perpendicular to the surface
-      // of the sphere
-      vector_t normal = qsubtract(intersection, sorted_spheres[currentSphere].pos);
+      vector_t normal = qsubtract(intersection, sphereCenter);
       float n_size = qsize(normal);
-      // Note: n_size should be the radius of the sphere, which is nonzero.
       normal = scale(1 / n_size, normal);
-
+      
+      // color the current pixel
       double red = 0;
       double green = 0;
       double blue = 0;
-
       for (int j = 0; j < state->r_spec.n_lights; j++) {
         light_t currentLight = state->r_spec.lights[j];
         vector_t intersection_to_light = qsubtract(currentLight.pos, intersection);
@@ -186,15 +232,12 @@ const float* render(renderer_state_t *state, const sphere_t *spheres, int n_sphe
 
         // Calculate Lambert diffusion
         float lambert = qdot(lightRay.dir, normal);
-        red += (double)(currentLight.intensity.red * currentMat.diffuse.red *
-                        lambert);
-        green += (double)(currentLight.intensity.green *
-                          currentMat.diffuse.green * lambert);
-        blue += (double)(currentLight.intensity.blue * currentMat.diffuse.blue *
-                         lambert);
+        red += (double)(currentLight.intensity.red * currentMat.diffuse.red * lambert);
+        green += (double)(currentLight.intensity.green * currentMat.diffuse.green * lambert);
+        blue += (double)(currentLight.intensity.blue * currentMat.diffuse.blue * lambert);
       }
-
       set_pixel(state, x, y, red, green, blue);
+      }
     }
   }
   free(sorted_spheres);
