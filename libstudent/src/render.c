@@ -138,6 +138,12 @@ void set_pixel(renderer_state_t *state, int x, int y, float red, float green, fl
   state->img[(x + y * state->r_spec.resolution) * 3 + 2] = min((float)blue, 1.0);
 }
 
+int check_edge(int val, int min_val, int max_val) {
+    if (val < min_val) return min_val;
+    if (val > max_val) return max_val;
+    return val;
+}
+
 const float* render(renderer_state_t *state, const sphere_t *spheres, int n_spheres) {
 
   if (PRINT_MESSAGE) printf("This is the new render function using %u spheres!\n", n_spheres);
@@ -217,12 +223,18 @@ const float* render(renderer_state_t *state, const sphere_t *spheres, int n_sphe
     }
     if (PRINT_MESSAGE) printf("min_x: %f, max_x: %f, min_y: %f, max_y: %f\n", min_x_2d, max_x_2d, min_y_2d, max_y_2d);
     
-    int x0 = (int)floorf(min_x_2d);
-    int x1 = (int)ceilf(max_x_2d);
-    int y0 = (int)floorf(min_y_2d);
-    int y1 = (int)ceilf(max_y_2d);
+    int half_size = res / 2;
+    int x0 = (int)floorf(min_x_2d + half_size - 5);
+    int x1 = (int)ceilf(max_x_2d + half_size + 5);
+    int y0 = (int)floorf(min_y_2d + half_size - 5);
+    int y1 = (int)ceilf(max_y_2d + half_size + 5);
     if (PRINT_MESSAGE) printf("half size: %u, x0: %u, x1: %u, y0: %u, y1: %u\n", half_size, x0, x1, y0, y1);
 
+    x0 = check_edge(x0, 0, res - 1);
+    x1 = check_edge(x1, 0, res - 1);
+    y0 = check_edge(y0, 0, res - 1);
+    y1 = check_edge(y1, 0, res - 1);
+    if (PRINT_MESSAGE) printf("edge case handled: x0: %u, x1: %u, y0: %u, y1: %u\n", x0, x1, y0, y1);
 
     // go through each pixel of the current sphere's projection
     for (int y = y0; y <= y1; y++) {
