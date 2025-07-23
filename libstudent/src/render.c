@@ -165,6 +165,11 @@ const float* render(renderer_state_t *state, const sphere_t *spheres, int n_sphe
     printf("w: %f %f %f\n\n", w.x, w.y, w.z);
   }
 
+  // create a vector to keep track of colored pixels
+  bool *colored = malloc(res * res * sizeof(bool));
+  for (int a = 0; a < res * res; a++)
+      colored[a] = false;
+
   // loop through each sphere
   for (int i = 0; i < n_spheres; i++) {
     sphere_t currentSphere = sorted_spheres[i];
@@ -239,6 +244,8 @@ const float* render(renderer_state_t *state, const sphere_t *spheres, int n_sphe
     // go through each pixel of the current sphere's projection
     for (int y = y0; y <= y1; y++) {
       for (int x = x0; x <= x1; x++) {
+
+      if (colored[y * res + x]) continue;
       
       // compute the ray to the current pixel
       ray_t r = origin_to_pixel(state, x, y);
@@ -277,9 +284,11 @@ const float* render(renderer_state_t *state, const sphere_t *spheres, int n_sphe
         blue += (double)(currentLight.intensity.blue * currentMat.diffuse.blue * lambert);
       }
       set_pixel(state, x, y, red, green, blue);
+      colored[y * res + x] = true;
       }
     }
   }
   free(sorted_spheres);
+  free(colored);
   return state->img;
 }
