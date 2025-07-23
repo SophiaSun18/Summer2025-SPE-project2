@@ -11,9 +11,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <math.h>
 
 #include "../../common/render.h"
 #include "../include/misc_utils.h"
+
+#define PRINT_MESSAGE 0
 
 typedef struct renderer_state {
   renderer_spec_t r_spec;
@@ -137,6 +140,8 @@ void set_pixel(renderer_state_t *state, int x, int y, float red, float green, fl
 
 const float* render(renderer_state_t *state, const sphere_t *spheres, int n_spheres) {
 
+  if (PRINT_MESSAGE) printf("This is the new render function using %u spheres!\n", n_spheres);
+
   // sort the spheres first as before
   sphere_t* sorted_spheres = sort(state, spheres, n_spheres);
   assert(sorted_spheres != NULL);
@@ -146,6 +151,13 @@ const float* render(renderer_state_t *state, const sphere_t *spheres, int n_sphe
   vector_t u = state->r_spec.proj_plane_u;
   vector_t v = state->r_spec.proj_plane_v;
   vector_t w = qcross(u, v);
+
+  if (PRINT_MESSAGE) {
+    printf("e: %f %f %f\n", e.x, e.y, e.z);
+    printf("u: %f %f %f\n", u.x, u.y, u.z);
+    printf("v: %f %f %f\n", v.x, v.y, v.z);
+    printf("w: %f %f %f\n\n", w.x, w.y, w.z);
+  }
 
   // loop through each sphere
   for (int i = 0; i < n_spheres; i++) {
@@ -158,6 +170,11 @@ const float* render(renderer_state_t *state, const sphere_t *spheres, int n_sphe
     float min_x = sphereCenter.x - sphereRadius, max_x = sphereCenter.x + sphereRadius;
     float min_y = sphereCenter.y - sphereRadius, max_y = sphereCenter.y + sphereRadius;
     float min_z = sphereCenter.z - sphereRadius, max_z = sphereCenter.z + sphereRadius;
+
+    if (PRINT_MESSAGE) {
+      printf("\ncenter: %f, %f, %f, radius: %f\n", sphereCenter.x, sphereCenter.y, sphereCenter.z, sphereRadius);
+      printf("%u x: %f %f, y: %f %f, z: %f %f\n", i, min_x, max_x, min_y, max_y, min_z, max_z);
+    }
 
     // collect the 8 corners of the cube in space and project to the 2d plane
     vector_2d bound_box[8];
@@ -178,6 +195,13 @@ const float* render(renderer_state_t *state, const sphere_t *spheres, int n_sphe
           vector_2d xy = {qdot(p, u), qdot(p, v)};
           bound_box[count++] = xy;
           
+          if (PRINT_MESSAGE) {
+            printf("corner x: %f, y: %f, z: %f\n", corner.x, corner.y, corner.z);
+            printf("dir x: %f, y: %f, z: %f\n", dir.x, dir.y, dir.z);
+            printf("k: %f\n", k);
+            printf("p x: %f, y: %f, z: %f\n", p.x, p.y, p.z);
+            printf("x: %f, y: %f\n\n", xy.x, xy.y);      
+          }
         }
       }
     }
@@ -191,10 +215,14 @@ const float* render(renderer_state_t *state, const sphere_t *spheres, int n_sphe
       min_y_2d = bound_box[n].y < min_y_2d ? bound_box[n].y : min_y_2d;
       max_y_2d = bound_box[n].y > max_y_2d ? bound_box[n].y : max_y_2d;
     }
+    if (PRINT_MESSAGE) printf("min_x: %f, max_x: %f, min_y: %f, max_y: %f\n", min_x_2d, max_x_2d, min_y_2d, max_y_2d);
+    
     int x0 = (int)floorf(min_x_2d);
     int x1 = (int)ceilf(max_x_2d);
     int y0 = (int)floorf(min_y_2d);
     int y1 = (int)ceilf(max_y_2d);
+    if (PRINT_MESSAGE) printf("half size: %u, x0: %u, x1: %u, y0: %u, y1: %u\n", half_size, x0, x1, y0, y1);
+
 
     // go through each pixel of the current sphere's projection
     for (int y = y0; y <= y1; y++) {
