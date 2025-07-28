@@ -139,9 +139,26 @@ void set_pixel(renderer_state_t *state, int x, int y, float red, float green, fl
 }
 
 int check_edge(int val, int min_val, int max_val) {
-    if (val < min_val) return min_val;
-    if (val > max_val) return max_val;
-    return val;
+  if (val < min_val) return min_val;
+  if (val > max_val) return max_val;
+  return val;
+}
+
+vector_2d project_to_plane(vector_t corner, vector_t e, vector_t u, vector_t v, vector_t w) {
+  vector_t dir = qsubtract(e, corner);
+  float k = qdot(e, w) / qdot(dir, w) * -1;
+  vector_t p = qadd(e, scale(k, dir));
+  vector_2d xy = {qdot(p, u), qdot(p, v)};
+
+  if (PRINT_MESSAGE) {
+    printf("corner x: %f, y: %f, z: %f\n", corner.x, corner.y, corner.z);
+    printf("dir x: %f, y: %f, z: %f\n", dir.x, dir.y, dir.z);
+    printf("k: %f\n", k);
+    printf("p x: %f, y: %f, z: %f\n", p.x, p.y, p.z);
+    printf("x: %f, y: %f\n\n", xy.x, xy.y);      
+  }
+
+  return xy;
 }
 
 const float* render(renderer_state_t *state, const sphere_t *spheres, int n_spheres) {
@@ -199,20 +216,8 @@ const float* render(renderer_state_t *state, const sphere_t *spheres, int n_sphe
           corner.y = (y == 0) ? min_y : max_y;
           corner.z = (z == 0) ? min_z : max_z;
 
-          vector_t dir = qsubtract(e, corner);
-          float k = qdot(e, w) / qdot(dir, w) * -1;
-          vector_t p = qadd(e, scale(k, dir));
-
-          vector_2d xy = {qdot(p, u), qdot(p, v)};
+          vector_2d xy = project_to_plane(corner, e, u, v, w);
           bound_box[count++] = xy;
-          
-          if (PRINT_MESSAGE) {
-            printf("corner x: %f, y: %f, z: %f\n", corner.x, corner.y, corner.z);
-            printf("dir x: %f, y: %f, z: %f\n", dir.x, dir.y, dir.z);
-            printf("k: %f\n", k);
-            printf("p x: %f, y: %f, z: %f\n", p.x, p.y, p.z);
-            printf("x: %f, y: %f\n\n", xy.x, xy.y);      
-          }
         }
       }
     }
