@@ -144,11 +144,11 @@ int check_edge(int val, int min_val, int max_val) {
   return val;
 }
 
-vector_2d project_to_plane(vector_t corner, vector_t e, vector_t u, vector_t v, vector_t w) {
+vector_2d project_to_plane(vector_t corner, vector_t e, vector_t u, vector_t v, vector_t w, float pixel_size) {
   vector_t dir = qsubtract(e, corner);
   float k = qdot(e, w) / qdot(dir, w) * -1;
   vector_t p = qadd(e, scale(k, dir));
-  vector_2d xy = {qdot(p, u), qdot(p, v)};
+  vector_2d xy = {qdot(p, u) / pixel_size, qdot(p, v) / pixel_size};
 
   if (PRINT_MESSAGE) {
     printf("corner x: %f, y: %f, z: %f\n", corner.x, corner.y, corner.z);
@@ -170,6 +170,7 @@ const float* render(renderer_state_t *state, const sphere_t *spheres, int n_sphe
   assert(sorted_spheres != NULL);
 
   int res = state->r_spec.resolution;
+  float pixel_size = state->r_spec.viewport_size / state->r_spec.resolution;
   vector_t e = state->r_spec.eye;
   vector_t u = state->r_spec.proj_plane_u;
   vector_t v = state->r_spec.proj_plane_v;
@@ -216,7 +217,7 @@ const float* render(renderer_state_t *state, const sphere_t *spheres, int n_sphe
           corner.y = (y == 0) ? min_y : max_y;
           corner.z = (z == 0) ? min_z : max_z;
 
-          vector_2d xy = project_to_plane(corner, e, u, v, w);
+          vector_2d xy = project_to_plane(corner, e, u, v, w, pixel_size);
           bound_box[count++] = xy;
         }
       }
@@ -233,11 +234,12 @@ const float* render(renderer_state_t *state, const sphere_t *spheres, int n_sphe
     }
     if (PRINT_MESSAGE) printf("min_x: %f, max_x: %f, min_y: %f, max_y: %f\n", min_x_2d, max_x_2d, min_y_2d, max_y_2d);
     
+    // round up and check edge to get the final bounding box range
     int half_size = res / 2;
-    int x0 = (int)floorf(min_x_2d + half_size - 5);
-    int x1 = (int)ceilf(max_x_2d + half_size + 5);
-    int y0 = (int)floorf(min_y_2d + half_size - 5);
-    int y1 = (int)ceilf(max_y_2d + half_size + 5);
+    int x0 = (int)floorf(min_x_2d + half_size);
+    int x1 = (int)ceilf(max_x_2d + half_size);
+    int y0 = (int)floorf(min_y_2d + half_size);
+    int y1 = (int)ceilf(max_y_2d + half_size);
     if (PRINT_MESSAGE) printf("half size: %u, x0: %u, x1: %u, y0: %u, y1: %u\n", half_size, x0, x1, y0, y1);
 
     x0 = check_edge(x0, 0, res - 1);
