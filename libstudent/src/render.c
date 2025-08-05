@@ -234,7 +234,7 @@ const float* render(renderer_state_t *state, const sphere_t *spheres, int n_sphe
     }
     if (PRINT_MESSAGE) printf("min_x: %f, max_x: %f, min_y: %f, max_y: %f\n", min_x_2d, max_x_2d, min_y_2d, max_y_2d);
     
-    // round up and check edge to get the final bounding box range
+    // coordinate conversion, round up and check edge to get the final bounding box range
     int half_size = res / 2;
     int x0 = check_edge((int)floorf(min_x_2d + half_size), 0, res - 1);
     int x1 = check_edge((int)ceilf(max_x_2d + half_size), 0, res - 1);

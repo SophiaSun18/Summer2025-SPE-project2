@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <math.h>
 
 #include "../../common/simulate.h"
 #include "../include/misc_utils.h"
@@ -16,6 +17,13 @@ typedef struct simulator_state {
   simulator_spec_t s_spec;
   sphere_t *spheres;
 } simulator_state_t;
+
+typedef struct {
+  float min_x, max_x, min_y, max_y, min_z, max_z;
+} bounding_box;
+
+int OLD_CHECK = 0;
+int BOX_CHECK = 0;
 
 simulator_state_t* init_simulator(const simulator_spec_t *spec) {
   simulator_state_t *state = (simulator_state_t*)malloc(sizeof(simulator_state_t));
@@ -104,6 +112,7 @@ void do_ministep(sphere_t *spheres, int n_spheres, double g, float minCollisionT
 // 
 // If so, modifies timeToCollision to be the time until spheres i and j collide.
 int check_for_collision(sphere_t *spheres, int i, int j, float *timeToCollision) {
+  OLD_CHECK++;
   vector_t distVec = qsubtract(spheres[i].pos, spheres[j].pos);
   float dist = qsize(distVec);
   float sumRadii = (float)((double)spheres[i].r + (double)spheres[j].r);
@@ -164,7 +173,29 @@ int check_for_collision(sphere_t *spheres, int i, int j, float *timeToCollision)
   return 1;
 }
 
-void do_timestep(simulator_state_t* state, float timeStep) {
+bounding_box generate_box(sphere_t* currentSphere, float t) {
+  vector_t start_pos = currentSphere->pos;
+  vector_t end_pos = qadd(currentSphere->pos, scale(t, currentSphere->vel));
+  float r = currentSphere->r;
+
+  bounding_box b;
+  b.min_x = fmin(start_pos.x, end_pos.x) - r;
+  b.max_x = fmax(start_pos.x, end_pos.x) + r;
+  b.min_y = fmin(start_pos.y, end_pos.y) - r;
+  b.max_y = fmax(start_pos.y, end_pos.y) + r;
+  b.min_z = fmin(start_pos.z, end_pos.z) - r;
+  b.max_z = fmax(start_pos.z, end_pos.z) + r;
+  return b;
+}
+
+bool check_box_collision(bounding_box* a, bounding_box* b) {
+  BOX_CHECK++;
+  return !(a->max_x < b->min_x || a->min_x > b->max_x ||
+           a->max_y < b->min_y || a->min_y > b->max_y ||
+           a->max_z < b->min_z || a->min_z > b->max_z);
+}
+
+void do_timestep(simulator_state_t* state, float timeStep, bounding_box* boxes) {
   float timeLeft = timeStep;
 
   // If collisions are getting too frequent, we cut time step early
@@ -173,12 +204,21 @@ void do_timestep(simulator_state_t* state, float timeStep) {
     float minCollisionTime = timeLeft;
     int indexCollider1 = -1;
     int indexCollider2 = -1;
+    
+    for (int i = 0; i < state->s_spec.n_spheres; i++) {
+      boxes[i] = generate_box(&state->spheres[i], minCollisionTime);
+    }
 
     for (int i = 0; i < state->s_spec.n_spheres; i++) {
+      bounding_box* box1 = &boxes[i];
       for (int j = i + 1; j < state->s_spec.n_spheres; j++) {
-        if (check_for_collision(state->spheres, i, j, &minCollisionTime)) {
-          indexCollider1 = i;
-          indexCollider2 = j;
+        bounding_box* box2 = &boxes[j];
+        
+        if (check_box_collision(box1, box2)) {
+          if (check_for_collision(state->spheres, i, j, &minCollisionTime)) {
+            indexCollider1 = i;
+            indexCollider2 = j;
+          }
         }
       }
     }
@@ -190,8 +230,13 @@ void do_timestep(simulator_state_t* state, float timeStep) {
 }
 
 sphere_t* simulate(simulator_state_t* state) {
+  OLD_CHECK = 0;
+  BOX_CHECK = 0;
   int n_spheres = state->s_spec.n_spheres;
   float timeStep = n_spheres > 1 ? (1 / log(n_spheres)) : 1;
-  do_timestep(state, timeStep);
+  bounding_box* boxes = malloc(sizeof(bounding_box) * n_spheres);
+  do_timestep(state, timeStep, boxes);
+  // printf("OLD_CHECK: %d\n", OLD_CHECK);
+  // printf("BOX_CHECK: %d\n", BOX_CHECK);
   return state->spheres;
 }
