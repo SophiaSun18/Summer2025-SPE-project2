@@ -227,6 +227,8 @@ void do_timestep(simulator_state_t* state, float timeStep, bounding_box* boxes) 
       for (int j = i + 1; j < n_spheres; j++) {
         bounding_box* box2 = &boxes[j];
         if (box2->min_x > box1->max_x) break;
+        if (box2->min_y > box1->max_y || box2->max_y < box1->min_y) continue;
+        if (box2->min_z > box1->max_z || box2->max_z < box1->min_z) continue;
 
         if (check_box_collision(box1, box2)) {
           if (check_for_collision(state->spheres, box1->sphere_index, box2->sphere_index, &minCollisionTime)) {
