@@ -20,6 +20,7 @@ typedef struct simulator_state {
 
 typedef struct {
   float min_x, max_x, min_y, max_y, min_z, max_z;
+  int sphere_index;
 } bounding_box;
 
 int OLD_CHECK = 0;
@@ -173,7 +174,7 @@ int check_for_collision(sphere_t *spheres, int i, int j, float *timeToCollision)
   return 1;
 }
 
-bounding_box generate_box(sphere_t* currentSphere, float t) {
+bounding_box generate_box(sphere_t* currentSphere, float t, int i) {
   vector_t start_pos = currentSphere->pos;
   vector_t end_pos = qadd(currentSphere->pos, scale(t, currentSphere->vel));
   float r = currentSphere->r;
@@ -185,6 +186,7 @@ bounding_box generate_box(sphere_t* currentSphere, float t) {
   b.max_y = fmax(start_pos.y, end_pos.y) + r;
   b.min_z = fmin(start_pos.z, end_pos.z) - r;
   b.max_z = fmax(start_pos.z, end_pos.z) + r;
+  b.sphere_index = i;
   return b;
 }
 
@@ -195,8 +197,18 @@ bool check_box_collision(bounding_box* a, bounding_box* b) {
            a->max_z < b->min_z || a->min_z > b->max_z);
 }
 
+int compare_boxes_by_x(const void* a, const void* b) {
+  bounding_box* box_a = (bounding_box*) a;
+  bounding_box* box_b = (bounding_box*) b;
+
+  if (box_a->min_x < box_b->min_x) return -1;
+  if (box_b->min_x < box_a->min_x) return 1;
+  return 0;
+}
+
 void do_timestep(simulator_state_t* state, float timeStep, bounding_box* boxes) {
   float timeLeft = timeStep;
+  int n_spheres = state->s_spec.n_spheres;
 
   // If collisions are getting too frequent, we cut time step early
   // This allows for smoother rendering without losing accuracy
@@ -205,19 +217,21 @@ void do_timestep(simulator_state_t* state, float timeStep, bounding_box* boxes) 
     int indexCollider1 = -1;
     int indexCollider2 = -1;
     
-    for (int i = 0; i < state->s_spec.n_spheres; i++) {
-      boxes[i] = generate_box(&state->spheres[i], minCollisionTime);
+    for (int i = 0; i < n_spheres; i++) {
+      boxes[i] = generate_box(&state->spheres[i], minCollisionTime, i);
     }
+    qsort(boxes, n_spheres, sizeof(bounding_box), compare_boxes_by_x);
 
-    for (int i = 0; i < state->s_spec.n_spheres; i++) {
+    for (int i = 0; i < n_spheres; i++) {
       bounding_box* box1 = &boxes[i];
-      for (int j = i + 1; j < state->s_spec.n_spheres; j++) {
+      for (int j = i + 1; j < n_spheres; j++) {
         bounding_box* box2 = &boxes[j];
-        
+        if (box2->min_x > box1->max_x) break;
+
         if (check_box_collision(box1, box2)) {
-          if (check_for_collision(state->spheres, i, j, &minCollisionTime)) {
-            indexCollider1 = i;
-            indexCollider2 = j;
+          if (check_for_collision(state->spheres, box1->sphere_index, box2->sphere_index, &minCollisionTime)) {
+            indexCollider1 = box1->sphere_index;
+            indexCollider2 = box2->sphere_index;
           }
         }
       }
