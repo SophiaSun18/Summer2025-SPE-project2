@@ -161,12 +161,30 @@ vector_2d project_to_plane(vector_t corner, vector_t e, vector_t u, vector_t v, 
   return xy;
 }
 
+vector_t e;
+
+int quick_sort_spheres(const void* a, const void* b) {
+  sphere_t* s_a = (sphere_t*) a;
+  sphere_t* s_b = (sphere_t*) b;
+
+  float dist_a = qdist(s_a->pos, e) * qdist(s_a->pos, e) - s_a->r * s_a->r;
+  float dist_b = qdist(s_b->pos, e) * qdist(s_b->pos, e) - s_b->r * s_b->r;
+
+  if (dist_a < dist_b) return -1;
+  if (dist_b < dist_a) return 1;
+  return 0;
+}
+
 const float* render(renderer_state_t *state, const sphere_t *spheres, int n_spheres) {
 
-  if (PRINT_MESSAGE) printf("This is the new render function using %u spheres!\n", n_spheres);
+  // printf("This is the new render function with %u spheres!\n", n_spheres);
 
   // sort the spheres first as before
-  sphere_t* sorted_spheres = sort(state, spheres, n_spheres);
+  e = state->r_spec.eye;
+  sphere_t* sorted_spheres = malloc(sizeof(sphere_t) * n_spheres);
+  memcpy(sorted_spheres, spheres, sizeof(sphere_t) * n_spheres);
+  qsort(sorted_spheres, n_spheres, sizeof(sphere_t), quick_sort_spheres);
+  // sphere_t* sorted_spheres = sort(state, spheres, n_spheres);
   assert(sorted_spheres != NULL);
 
   int res = state->r_spec.resolution;
