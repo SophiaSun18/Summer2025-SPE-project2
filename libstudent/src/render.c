@@ -27,6 +27,11 @@ typedef struct {
   float x, y;
 } vector_2d;
 
+typedef struct {
+  vector_t pos;
+  float red, green, blue;
+} pre_light;
+
 renderer_state_t* init_renderer(const renderer_spec_t *spec) {
   renderer_state_t *state = (renderer_state_t*)malloc(sizeof(renderer_state_t));
   state->r_spec = *spec;
@@ -189,7 +194,6 @@ const float* render(renderer_state_t *state, const sphere_t *spheres, int n_sphe
 
   int res = state->r_spec.resolution;
   float pixel_size = state->r_spec.viewport_size / state->r_spec.resolution;
-  vector_t e = state->r_spec.eye;
   vector_t u = state->r_spec.proj_plane_u;
   vector_t v = state->r_spec.proj_plane_v;
   vector_t w = qcross(u, v);
@@ -260,6 +264,16 @@ const float* render(renderer_state_t *state, const sphere_t *spheres, int n_sphe
     int y1 = check_edge((int)ceilf(max_y_2d + half_size), 0, res - 1);
     if (PRINT_MESSAGE) printf("edge case handled: x0: %u, x1: %u, y0: %u, y1: %u\n", x0, x1, y0, y1);
 
+    // precompute parts of the light color
+    pre_light* pre_lights = malloc(sizeof(pre_light) * state->r_spec.n_lights);
+    for (int l = 0; l < state->r_spec.n_lights; l++) {
+      light_t currentLight = state->r_spec.lights[l];
+      pre_lights[l].pos = currentLight.pos;
+      pre_lights[l].red = currentLight.intensity.red * currentMat.diffuse.red;
+      pre_lights[l].green = currentLight.intensity.green * currentMat.diffuse.green;
+      pre_lights[l].blue = currentLight.intensity.blue * currentMat.diffuse.blue;
+    }
+
     // go through each pixel of the current sphere's projection
     for (int y = y0; y <= y1; y++) {
       for (int x = x0; x <= x1; x++) {
@@ -287,7 +301,8 @@ const float* render(renderer_state_t *state, const sphere_t *spheres, int n_sphe
       double green = 0;
       double blue = 0;
       for (int j = 0; j < state->r_spec.n_lights; j++) {
-        light_t currentLight = state->r_spec.lights[j];
+        // light_t currentLight = state->r_spec.lights[j];
+        pre_light currentLight = pre_lights[j];
         vector_t intersection_to_light = qsubtract(currentLight.pos, intersection);
         if (qdot(normal, intersection_to_light) <= 0)
           continue;
@@ -298,9 +313,12 @@ const float* render(renderer_state_t *state, const sphere_t *spheres, int n_sphe
 
         // Calculate Lambert diffusion
         float lambert = qdot(lightRay.dir, normal);
-        red += (double)(currentLight.intensity.red * currentMat.diffuse.red * lambert);
-        green += (double)(currentLight.intensity.green * currentMat.diffuse.green * lambert);
-        blue += (double)(currentLight.intensity.blue * currentMat.diffuse.blue * lambert);
+        // red += (double)(currentLight.intensity.red * currentMat.diffuse.red * lambert);
+        // green += (double)(currentLight.intensity.green * currentMat.diffuse.green * lambert);
+        // blue += (double)(currentLight.intensity.blue * currentMat.diffuse.blue * lambert);
+        red += (double)(currentLight.red * lambert);
+        green += (double)(currentLight.green * lambert);
+        blue += (double)(currentLight.blue * lambert);
       }
       set_pixel(state, x, y, red, green, blue);
       colored[y * res + x] = true;
