@@ -275,7 +275,7 @@ const float* render(renderer_state_t *state, const sphere_t *spheres, int n_sphe
     }
 
     // go through each pixel of the current sphere's projection
-    for (int y = y0; y <= y1; y++) {
+    cilk_for (int y = y0; y <= y1; y++) {
       for (int x = x0; x <= x1; x++) {
 
       if (colored[y * res + x]) continue;

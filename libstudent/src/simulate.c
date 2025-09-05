@@ -64,19 +64,19 @@ void update_accel_sphere(sphere_t *spheres, int n_spheres, double g, int i) {
 }
 
 void update_accelerations(sphere_t *spheres, int n_spheres, double g) {
-  for (int i = 0; i < n_spheres; i++) {
+  cilk_for (int i = 0; i < n_spheres; i++) {
     update_accel_sphere(spheres, n_spheres, g, i);
   }
 }
 
 void update_velocities(sphere_t *spheres, int n_spheres, float t) {
-  for (int i = 0; i < n_spheres; i++) {
+  cilk_for (int i = 0; i < n_spheres; i++) {
     spheres[i + n_spheres].vel = qadd(spheres[i].vel, scale(t, spheres[i].accel));
   }
 }
 
 void update_positions(sphere_t *spheres, int n_spheres, float t) {
-  for (int i = 0; i < n_spheres; i++) {
+  cilk_for (int i = 0; i < n_spheres; i++) {
     spheres[i + n_spheres].pos = qadd(spheres[i].pos, scale(t, spheres[i].vel));
   }
 }
