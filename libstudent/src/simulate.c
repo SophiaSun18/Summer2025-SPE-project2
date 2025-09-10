@@ -52,8 +52,12 @@ void update_accel_sphere(sphere_t *spheres, int n_spheres, double g, int i) {
     if (i != j) {
       vector_t i_minus_j = qsubtract(spheres[i].pos, spheres[j].pos);
       vector_t j_minus_i = scale(-1, i_minus_j);
+
+      double r = qsize(i_minus_j);
+      double cube = r * r * r;
       vector_t force =
-          scale(g * spheres[j].mass / pow(qsize(i_minus_j), 3), j_minus_i);
+          scale(g * spheres[j].mass / cube, j_minus_i);
+      
       rx += (double)force.x;
       ry += (double)force.y;
       rz += (double)force.z;
