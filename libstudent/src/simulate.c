@@ -250,5 +250,6 @@ sphere_t* simulate(simulator_state_t* state) {
   float timeStep = n_spheres > 1 ? (1 / log(n_spheres)) : 1;
   bounding_box* boxes = malloc(sizeof(bounding_box) * n_spheres);
   do_timestep(state, timeStep, boxes);
+  free(boxes);
   return state->spheres;
 }

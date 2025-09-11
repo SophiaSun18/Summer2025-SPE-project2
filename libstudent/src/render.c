@@ -293,6 +293,7 @@ const float* render(renderer_state_t *state, const sphere_t *spheres, int n_sphe
       colored[y * res + x] = true;
       }
     }
+    free(pre_lights);
   }
   free(sorted_spheres);
   free(colored);
