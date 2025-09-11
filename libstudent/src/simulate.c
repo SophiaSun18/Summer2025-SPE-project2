@@ -38,7 +38,7 @@ void destroy_simulator(simulator_state_t* state) {
   free(state);
 }
 
-void update_accel_sphere(sphere_t *spheres, int n_spheres, double g, int i) {
+void update_accel_sphere_ref(sphere_t *spheres, int n_spheres, double g, int i) {
   double rx = 0;
   double ry = 0;
   double rz = 0;
@@ -46,27 +46,58 @@ void update_accel_sphere(sphere_t *spheres, int n_spheres, double g, int i) {
   const vector_t zero_vec = {0, 0, 0};
   spheres[i + n_spheres].accel = zero_vec;
   for (int j = 0; j < n_spheres; j++) {
-    if (i != j) {
+    if (i == j) continue;
       vector_t i_minus_j = qsubtract(spheres[i].pos, spheres[j].pos);
       vector_t j_minus_i = scale(-1, i_minus_j);
 
       double r = qsize(i_minus_j);
       double cube = r * r * r;
-      vector_t force =
-          scale(g * spheres[j].mass / cube, j_minus_i);
+    vector_t force = scale(g * spheres[j].mass / cube, j_minus_i);
       
       rx += (double)force.x;
       ry += (double)force.y;
       rz += (double)force.z;
     }
-  }
   const vector_t v = {.x = rx, .y = ry, .z = rz};
   spheres[i + n_spheres].accel = v;
 }
 
+void update_accel_sphere_new(sphere_t *spheres, double* accel, int n_spheres, double g, int i) {
+  double rx_i = accel[i * 3];
+  double ry_i = accel[i * 3 + 1];
+  double rz_i = accel[i * 3 + 2];
+
+  for (int j = i + 1; j < n_spheres; j++) {
+    vector_t i_minus_j = qsubtract(spheres[i].pos, spheres[j].pos);
+    vector_t j_minus_i = scale(-1, i_minus_j);
+
+    double r = qsize(i_minus_j);
+    double cube = r * r * r;
+    vector_t force_i = scale(g * spheres[j].mass / cube, j_minus_i);
+    vector_t force_j = scale(g * spheres[i].mass / cube, i_minus_j);
+
+    rx_i += (double)force_i.x;
+    ry_i += (double)force_i.y;
+    rz_i += (double)force_i.z;
+    
+    accel[j * 3] += (double)force_j.x;
+    accel[j * 3 + 1] += (double)force_j.y;
+    accel[j * 3 + 2] += (double)force_j.z;
+  }
+  accel[i * 3] = rx_i;
+  accel[i * 3 + 1] = ry_i;
+  accel[i * 3 + 2] = rz_i;
+}
+
 void update_accelerations(sphere_t *spheres, int n_spheres, double g) {
-  cilk_for (int i = 0; i < n_spheres; i++) {
-    update_accel_sphere(spheres, n_spheres, g, i);
+  double* accel = calloc(n_spheres * 3, sizeof(double));
+  for (int i = 0; i < n_spheres; i++) {
+    update_accel_sphere_new(spheres, accel, n_spheres, g, i);
+  }
+  for (int i = 0; i < n_spheres; i++) {
+    spheres[i + n_spheres].accel.x = accel[i * 3];
+    spheres[i + n_spheres].accel.y = accel[i * 3 + 1];
+    spheres[i + n_spheres].accel.z = accel[i * 3 + 2];
   }
 }
 
