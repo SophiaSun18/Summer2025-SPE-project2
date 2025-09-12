@@ -49,48 +49,48 @@ void update_accel_sphere_ref(sphere_t *spheres, int n_spheres, double g, int i) 
   spheres[i + n_spheres].accel = zero_vec;
   for (int j = 0; j < n_spheres; j++) {
     if (i == j) continue;
-      vector_t i_minus_j = qsubtract(spheres[i].pos, spheres[j].pos);
-      vector_t j_minus_i = scale(-1, i_minus_j);
+    vector_t i_minus_j = qsubtract(spheres[i].pos, spheres[j].pos);
+    vector_t j_minus_i = scale(-1, i_minus_j);
 
-      double r = qsize(i_minus_j);
-      double cube = r * r * r;
+    double r = qsize(i_minus_j);
+    double cube = r * r * r;
     vector_t force = scale(g * spheres[j].mass / cube, j_minus_i);
-      
-      rx += (double)force.x;
-      ry += (double)force.y;
-      rz += (double)force.z;
-    }
+    
+    rx += (double)force.x;
+    ry += (double)force.y;
+    rz += (double)force.z;
+  }
   const vector_t v = {.x = rx, .y = ry, .z = rz};
   spheres[i + n_spheres].accel = v;
 }
 
 void update_accel_sphere_serial(sphere_t *spheres, double* accel, int n_spheres, double g) {
   for (int i = 0; i < n_spheres; i++) {
-  double rx_i = accel[i * 3];
-  double ry_i = accel[i * 3 + 1];
-  double rz_i = accel[i * 3 + 2];
+    double rx_i = accel[i * 3];
+    double ry_i = accel[i * 3 + 1];
+    double rz_i = accel[i * 3 + 2];
 
-  for (int j = i + 1; j < n_spheres; j++) {
-    vector_t i_minus_j = qsubtract(spheres[i].pos, spheres[j].pos);
-    vector_t j_minus_i = scale(-1, i_minus_j);
+    for (int j = i + 1; j < n_spheres; j++) {
+      vector_t i_minus_j = qsubtract(spheres[i].pos, spheres[j].pos);
+      vector_t j_minus_i = scale(-1, i_minus_j);
 
-    double r = qsize(i_minus_j);
-    double cube = r * r * r;
-    vector_t force_i = scale(g * spheres[j].mass / cube, j_minus_i);
-    vector_t force_j = scale(g * spheres[i].mass / cube, i_minus_j);
+      double r = qsize(i_minus_j);
+      double cube = r * r * r;
+      vector_t force_i = scale(g * spheres[j].mass / cube, j_minus_i);
+      vector_t force_j = scale(g * spheres[i].mass / cube, i_minus_j);
 
-    rx_i += (double)force_i.x;
-    ry_i += (double)force_i.y;
-    rz_i += (double)force_i.z;
-    
-    accel[j * 3] += (double)force_j.x;
-    accel[j * 3 + 1] += (double)force_j.y;
-    accel[j * 3 + 2] += (double)force_j.z;
+      rx_i += (double)force_i.x;
+      ry_i += (double)force_i.y;
+      rz_i += (double)force_i.z;
+      
+      accel[j * 3] += (double)force_j.x;
+      accel[j * 3 + 1] += (double)force_j.y;
+      accel[j * 3 + 2] += (double)force_j.z;
+    }
+    accel[i * 3] = rx_i;
+    accel[i * 3 + 1] = ry_i;
+    accel[i * 3 + 2] = rz_i;
   }
-  accel[i * 3] = rx_i;
-  accel[i * 3 + 1] = ry_i;
-  accel[i * 3 + 2] = rz_i;
-}
 }
 
 void update_accel_sphere_rectangle(sphere_t *spheres, double* ax, double* ay, double* az, int n_spheres, double g, int i0, int i1, int j0, int j1) {
@@ -119,12 +119,13 @@ void update_accel_sphere_rectangle(sphere_t *spheres, double* ax, double* ay, do
     for (int j = j0; j < j1; j++) {
       if (i == j) continue;
       vector_t i_minus_j = qsubtract(spheres[i].pos, spheres[j].pos);
-      vector_t j_minus_i = scale(-1, i_minus_j);
 
       double r = qsize(i_minus_j);
       double cube = r * r * r;
-      vector_t force_i = scale(g * spheres[j].mass / cube, j_minus_i);
-      vector_t force_j = scale(g * spheres[i].mass / cube, i_minus_j);
+      double force_scale = g / cube;
+
+      vector_t force_i = scale(-spheres[j].mass * force_scale, i_minus_j);
+      vector_t force_j = scale(spheres[i].mass * force_scale, i_minus_j);
 
       rx_i += (double)force_i.x;
       ry_i += (double)force_i.y;
@@ -162,12 +163,13 @@ void update_accel_sphere_triangle(sphere_t *spheres, double* ax, double* ay, dou
 
     for (int j = i + 1; j < j1; j++) {
       vector_t i_minus_j = qsubtract(spheres[i].pos, spheres[j].pos);
-      vector_t j_minus_i = scale(-1, i_minus_j);
 
       double r = qsize(i_minus_j);
       double cube = r * r * r;
-      vector_t force_i = scale(g * spheres[j].mass / cube, j_minus_i);
-      vector_t force_j = scale(g * spheres[i].mass / cube, i_minus_j);
+      double force_scale = g / cube;
+
+      vector_t force_i = scale(-spheres[j].mass * force_scale, i_minus_j);
+      vector_t force_j = scale(spheres[i].mass * force_scale, i_minus_j);
 
       rx_i += (double)force_i.x;
       ry_i += (double)force_i.y;
@@ -360,12 +362,12 @@ void do_timestep(simulator_state_t* state, float timeStep, bounding_box* boxes) 
         if (box2->min_y > box1->max_y || box2->max_y < box1->min_y) continue;
         if (box2->min_z > box1->max_z || box2->max_z < box1->min_z) continue;
 
-          if (check_for_collision(state->spheres, box1->sphere_index, box2->sphere_index, &minCollisionTime)) {
-            indexCollider1 = box1->sphere_index;
-            indexCollider2 = box2->sphere_index;
-          }
+        if (check_for_collision(state->spheres, box1->sphere_index, box2->sphere_index, &minCollisionTime)) {
+          indexCollider1 = box1->sphere_index;
+          indexCollider2 = box2->sphere_index;
         }
       }
+    }
 
     do_ministep(state->spheres, state->s_spec.n_spheres, state->s_spec.g, minCollisionTime, indexCollider1, indexCollider2);
 
