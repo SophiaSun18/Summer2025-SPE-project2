@@ -1,6 +1,6 @@
 # Project 2 Beta Write-up
 
-## Design Overview
+## Beta Design Overview
 The beta design introduces the following improvements based on the starter code:
 
 ### Render() function redesign
@@ -23,15 +23,23 @@ The beta submission implements color precomputation, which precomputes and reuse
 ### Parallelism
 The beta submission uses `cilk_for` to parallelise the following functions: the bounding box ray-tracing part in `render()` (tier 48), `update_accelerations()`, `update_velocities()` and `update_positions()` in `simulate()` (tier 62) running in 8 cores on `telerun`.
 
+## Final Improvements
+
+### Simulate(): replace pow() with multiplications
+In the final design, the time-consuming `pow()` in `update_accel_sphere()` is replaced by multiplications. After some debugging on the data type, the output passes the correctness check and brings the program's performance to tier 67 when running on 8 cores.
+
+### Redesign Update_accelerations() to utilize the symmetrical calculation
+In `update_accelerations()`, the gravity between sphere i and j can be used twice to calculate both the force from i to j and the force form j to i, and the final submission has redesigned this function so that half of the calculations can be reduced.
+
+Then, based on this optimization, a new parallelism approach is implemented in the final submission according to the triangle/rectangle design in the project handout. The acceleration calculation task across all spheres can be visualized as a triangle, covers the range of (0, N) for i and (i + 1, N) for j. This triangle can be recursively divided into 2 smaller triangles and 1 rectangle, so that there won't be a read/write race condition when processing triangles and rectangles one after another. Furthermore, the rectangle area can also be recursively divided into 4 smaller rectangles and avoid race condition by processing 2 diagnoal rectangles in a group. This parallel algorithm reduces the computation task while avoiding the race condition, but it failed to bring the program to a higher tier.
+
+### Sweep&Prune fix
+In the final submission, a small redundant step in the sweep&prune implementation is removed, which makes the program faster by about 40ms but not enough to reach a higher tier.
+
 ## State of Completeness and Expected Performance
-Currently, the beta submission passes the correctness check and reaches tier 62 in performance check when running on `telerun` in 8 cores. 
+The beta submission passes the correctness check and reaches tier 62 in performance check when running on `telerun` in 8 cores.
+
+The final submission reaches tier 67 consistently, and reached tier 68 and tier 70 for once, respectively.
 
 ## Additional Information
-Some effort was spent on modifying `update_accel_sphere()` to exploit symmetry in gravititional force calculation and reuse some computation results, but this attempt has failed due to floating point precision issue. After several attempts to improve precision, the changes were reverted eventually to ensure more stable performance.
-
-## Next step
-* Function inlining
-* Built-in intrinsics
-* Vectorization
-* Race condition check
-* Further parallelism according to the handout
+Some effort was spent on modifying `update_accel_sphere()` to exploit symmetry in gravititional force calculation and reuse some computation results in the beta submission, but this attempt has failed due to floating point precision issue. After several attempts to improve precision, the changes were reverted eventually to ensure more stable performance. In the final submission, this issue has been resolved and the symmetrical result is utilized to improve the performance of the program.
