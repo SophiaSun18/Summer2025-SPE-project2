@@ -13,7 +13,7 @@
 #include "../../common/simulate.h"
 #include "../include/misc_utils.h"
 
-#define THRESHOLD 10
+#define THRESHOLD 64
 
 typedef struct simulator_state {
   simulator_spec_t s_spec;
@@ -144,7 +144,7 @@ void update_accel_sphere_triangle(sphere_t *spheres, double* ax, double* ay, dou
   int edge = i1 - i0;
   
   // check if the triangle is small enough to process serially
-  if (edge > THRESHOLD) {
+  if (edge > THRESHOLD * 1.5) {
     int i_mid = (i0 + i1) / 2;
     int j_mid = (j0 + j1) / 2;
     cilk_scope {  // top left and bottom right sub-triangle
@@ -360,14 +360,12 @@ void do_timestep(simulator_state_t* state, float timeStep, bounding_box* boxes) 
         if (box2->min_y > box1->max_y || box2->max_y < box1->min_y) continue;
         if (box2->min_z > box1->max_z || box2->max_z < box1->min_z) continue;
 
-        if (check_box_collision(box1, box2)) {
           if (check_for_collision(state->spheres, box1->sphere_index, box2->sphere_index, &minCollisionTime)) {
             indexCollider1 = box1->sphere_index;
             indexCollider2 = box2->sphere_index;
           }
         }
       }
-    }
 
     do_ministep(state->spheres, state->s_spec.n_spheres, state->s_spec.g, minCollisionTime, indexCollider1, indexCollider2);
 
