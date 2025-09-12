@@ -93,7 +93,7 @@ void update_accel_sphere_serial(sphere_t *spheres, double* accel, int n_spheres,
 }
 }
 
-void update_accel_sphere_rectangle(sphere_t *spheres, double* accel, int n_spheres, double g, int i0, int i1, int j0, int j1) {
+void update_accel_sphere_rectangle(sphere_t *spheres, double* ax, double* ay, double* az, int n_spheres, double g, int i0, int i1, int j0, int j1) {
   int edge = i1 - i0;
   
   // check if the rectangle is small enough to process serially
@@ -101,20 +101,20 @@ void update_accel_sphere_rectangle(sphere_t *spheres, double* accel, int n_spher
     int i_mid = (i0 + i1) / 2;
     int j_mid = (j0 + j1) / 2;
     cilk_scope {  // top left and bottom right sub-rectangles
-      cilk_spawn(update_accel_sphere_rectangle(spheres, accel, n_spheres, g, i0, i_mid, j0, j_mid));
-      update_accel_sphere_rectangle(spheres, accel, n_spheres, g, i_mid, i1, j_mid, j1);
+      cilk_spawn(update_accel_sphere_rectangle(spheres, ax, ay, az, n_spheres, g, i0, i_mid, j0, j_mid));
+      update_accel_sphere_rectangle(spheres, ax, ay, az, n_spheres, g, i_mid, i1, j_mid, j1);
     }
     cilk_scope {  // bottom left and top right sub-rectangles
-      cilk_spawn(update_accel_sphere_rectangle(spheres, accel, n_spheres, g, i_mid, i1, j0, j_mid));
-      update_accel_sphere_rectangle(spheres, accel, n_spheres, g, i0, i_mid, j_mid, j1);
+      cilk_spawn(update_accel_sphere_rectangle(spheres, ax, ay, az, n_spheres, g, i_mid, i1, j0, j_mid));
+      update_accel_sphere_rectangle(spheres, ax, ay, az, n_spheres, g, i0, i_mid, j_mid, j1);
     }
     return;
   }
 
   for (int i = i0; i < i1; i++) {
-    double rx_i = accel[i * 3];
-    double ry_i = accel[i * 3 + 1];
-    double rz_i = accel[i * 3 + 2];
+    double rx_i = ax[i];
+    double ry_i = ay[i];
+    double rz_i = az[i];
 
     for (int j = j0; j < j1; j++) {
       if (i == j) continue;
@@ -130,17 +130,17 @@ void update_accel_sphere_rectangle(sphere_t *spheres, double* accel, int n_spher
       ry_i += (double)force_i.y;
       rz_i += (double)force_i.z;
       
-      accel[j * 3] += (double)force_j.x;
-      accel[j * 3 + 1] += (double)force_j.y;
-      accel[j * 3 + 2] += (double)force_j.z;
+      ax[j] += (double)force_j.x;
+      ay[j] += (double)force_j.y;
+      az[j] += (double)force_j.z;
     }
-    accel[i * 3] = rx_i;
-    accel[i * 3 + 1] = ry_i;
-    accel[i * 3 + 2] = rz_i;
+    ax[i] = rx_i;
+    ay[i] = ry_i;
+    az[i] = rz_i;
   }
 }
 
-void update_accel_sphere_triangle(sphere_t *spheres, double* accel, int n_spheres, double g, int i0, int i1, int j0, int j1) {
+void update_accel_sphere_triangle(sphere_t *spheres, double* ax, double* ay, double* az, int n_spheres, double g, int i0, int i1, int j0, int j1) {
   int edge = i1 - i0;
   
   // check if the triangle is small enough to process serially
@@ -148,17 +148,17 @@ void update_accel_sphere_triangle(sphere_t *spheres, double* accel, int n_sphere
     int i_mid = (i0 + i1) / 2;
     int j_mid = (j0 + j1) / 2;
     cilk_scope {  // top left and bottom right sub-triangle
-      cilk_spawn(update_accel_sphere_triangle(spheres, accel, n_spheres, g, i0, i_mid, j0, j_mid));
-      update_accel_sphere_triangle(spheres, accel, n_spheres, g, i_mid, i1, j_mid, j1);
+      cilk_spawn(update_accel_sphere_triangle(spheres, ax, ay, az, n_spheres, g, i0, i_mid, j0, j_mid));
+      update_accel_sphere_triangle(spheres, ax, ay, az, n_spheres, g, i_mid, i1, j_mid, j1);
     }   // bottom left sub-rectangle 
-    update_accel_sphere_rectangle(spheres, accel, n_spheres, g, i_mid, i1, j0, j_mid);
+    update_accel_sphere_rectangle(spheres, ax, ay, az, n_spheres, g, i_mid, i1, j0, j_mid);
     return;
   }
 
   for (int i = i0; i < i1; i++) {
-    double rx_i = accel[i * 3];
-    double ry_i = accel[i * 3 + 1];
-    double rz_i = accel[i * 3 + 2];
+    double rx_i = ax[i];
+    double ry_i = ay[i];
+    double rz_i = az[i];
 
     for (int j = i + 1; j < j1; j++) {
       vector_t i_minus_j = qsubtract(spheres[i].pos, spheres[j].pos);
@@ -173,25 +173,31 @@ void update_accel_sphere_triangle(sphere_t *spheres, double* accel, int n_sphere
       ry_i += (double)force_i.y;
       rz_i += (double)force_i.z;
       
-      accel[j * 3] += (double)force_j.x;
-      accel[j * 3 + 1] += (double)force_j.y;
-      accel[j * 3 + 2] += (double)force_j.z;
+      ax[j] += (double)force_j.x;
+      ay[j] += (double)force_j.y;
+      az[j] += (double)force_j.z;
     }
-    accel[i * 3] = rx_i;
-    accel[i * 3 + 1] = ry_i;
-    accel[i * 3 + 2] = rz_i;
+    ax[i] = rx_i;
+    ay[i] = ry_i;
+    az[i] = rz_i;
   }
 }
 
 void update_accelerations(sphere_t *spheres, int n_spheres, double g) {
-  double* accel = calloc(n_spheres * 3, sizeof(double));
-  update_accel_sphere_triangle(spheres, accel, n_spheres, g, 0, n_spheres, 0, n_spheres);
+  double* ax = calloc(n_spheres, sizeof(double));
+  double* ay = calloc(n_spheres, sizeof(double));
+  double* az = calloc(n_spheres, sizeof(double));
+
+  update_accel_sphere_triangle(spheres, ax, ay, az, n_spheres, g, 0, n_spheres, 0, n_spheres);
   for (int i = 0; i < n_spheres; i++) {
-    spheres[i + n_spheres].accel.x = accel[i * 3];
-    spheres[i + n_spheres].accel.y = accel[i * 3 + 1];
-    spheres[i + n_spheres].accel.z = accel[i * 3 + 2];
+    spheres[i + n_spheres].accel.x = ax[i];
+    spheres[i + n_spheres].accel.y = ay[i];
+    spheres[i + n_spheres].accel.z = az[i];
   }
-  free(accel);
+
+  free(ax);
+  free(ay);
+  free(az);
 }
 
 void update_velocities(sphere_t *spheres, int n_spheres, float t) {
